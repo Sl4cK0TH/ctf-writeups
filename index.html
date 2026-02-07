@@ -1,27 +1,286 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zor0ark's CTF Writeups</title>
     <style>
-        body { font-family: monospace; background: #0d1117; color: #c9d1d9; padding: 2rem; }
-        a { color: #58a6ff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        ul { list-style-type: none; padding: 0; }
-        li { margin: 10px 0; }
-        .category { color: #8b949e; font-weight: bold; margin-top: 20px; }
+        :root {
+            --bg-dark: #0d1117;
+            --bg-terminal: #161b22;
+            --text-primary: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-purple: #a371f7;
+            --border-color: #30363d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .terminal {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-terminal);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+        }
+
+        .terminal-header {
+            background: linear-gradient(180deg, #2d333b 0%, #22272e 100%);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .terminal-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .btn-red { background: #ff5f56; }
+        .btn-yellow { background: #ffbd2e; }
+        .btn-green { background: #27c93f; }
+
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .terminal-body {
+            padding: 1.5rem;
+        }
+
+        .prompt {
+            color: var(--accent-green);
+        }
+
+        .command {
+            color: var(--accent-blue);
+        }
+
+        .output {
+            margin: 1rem 0 2rem;
+        }
+
+        .tree-line {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+            transition: background 0.15s ease;
+        }
+
+        .tree-line:hover {
+            background: rgba(88, 166, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .tree-prefix {
+            color: var(--text-dim);
+            white-space: pre;
+            user-select: none;
+        }
+
+        .folder {
+            color: var(--accent-blue);
+        }
+
+        .folder::before {
+            content: '📁 ';
+        }
+
+        .file {
+            color: var(--text-primary);
+        }
+
+        .file::before {
+            content: '📄 ';
+        }
+
+        .writeup {
+            color: var(--accent-green);
+        }
+
+        .writeup::before {
+            content: '🏴 ';
+        }
+
+        .empty {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        .empty::before {
+            content: '⏳ ';
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+        }
+
+        .badge-done {
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+
+        .badge-soon {
+            background: rgba(210, 153, 34, 0.2);
+            color: var(--accent-yellow);
+            border: 1px solid var(--accent-yellow);
+        }
+
+        .intro {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .intro-text {
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+        }
+
+        .ascii-art {
+            color: var(--accent-purple);
+            font-size: 0.7rem;
+            line-height: 1.2;
+            margin-bottom: 1.5rem;
+            opacity: 0.8;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px dashed var(--border-color);
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1.2em;
+            background: var(--accent-green);
+            animation: blink 1s step-end infinite;
+            vertical-align: text-bottom;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            .terminal-body { padding: 1rem; }
+            .ascii-art { display: none; }
+        }
     </style>
 </head>
 <body>
-    <p>Welcome to my CTF writeup collection.</p>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="terminal-btn btn-red"></div>
+            <div class="terminal-btn btn-yellow"></div>
+            <div class="terminal-btn btn-green"></div>
+            <span class="terminal-title">zor0ark@ctf:~/writeups</span>
+        </div>
+        <div class="terminal-body">
+            <pre class="ascii-art">
+ ██████╗████████╗███████╗    ██╗    ██╗██████╗ ██╗████████╗███████╗██╗   ██╗██████╗ ███████╗
+██╔════╝╚══██╔══╝██╔════╝    ██║    ██║██╔══██╗██║╚══██╔══╝██╔════╝██║   ██║██╔══██╗██╔════╝
+██║        ██║   █████╗      ██║ █╗ ██║██████╔╝██║   ██║   █████╗  ██║   ██║██████╔╝███████╗
+██║        ██║   ██╔══╝      ██║███╗██║██╔══██╗██║   ██║   ██╔══╝  ██║   ██║██╔═══╝ ╚════██║
+╚██████╗   ██║   ██║         ╚███╔███╔╝██║  ██║██║   ██║   ███████╗╚██████╔╝██║     ███████║
+ ╚═════╝   ╚═╝   ╚═╝          ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝   ╚═╝   ╚══════╝ ╚═════╝ ╚═╝     ╚══════╝
+            </pre>
 
-    <div class="category">TryHackMe</div>
-    <ul>
-        <li>[<a href="TryHackMe/Message-To-Garcia/">DIR</a>] <a href="TryHackMe/Message-To-Garcia/">Message To Garcia</a></li>
-    </ul>
+            <div class="intro">
+                <span class="prompt">zor0ark@ctf</span>:<span class="command">~</span>$ cat welcome.txt
+                <p class="intro-text">Welcome to my CTF writeup collection. Browse the tree below to explore challenges.</p>
+            </div>
 
-    <div class="category">HackTheBox</div>
-    <ul>
-        <li><i>No writeups yet...</i></li>
-    </ul>
+            <div>
+                <span class="prompt">zor0ark@ctf</span>:<span class="command">~</span>$ tree ./ctf-writeups
+            </div>
+
+            <div class="output">
+                <div class="tree-line">
+                    <span class="tree-prefix"></span>
+                    <span class="folder">ctf-writeups</span>
+                </div>
+
+                <!-- TryHackMe -->
+                <div class="tree-line">
+                    <span class="tree-prefix">├── </span>
+                    <a href="TryHackMe/" class="folder">TryHackMe</a>
+                    <span class="status-badge badge-done">1 writeup</span>
+                </div>
+                <div class="tree-line">
+                    <span class="tree-prefix">│   └── </span>
+                    <a href="TryHackMe/Message-To-Garcia/" class="writeup">Message-To-Garcia</a>
+                </div>
+
+                <!-- HackTheBox -->
+                <div class="tree-line">
+                    <span class="tree-prefix">├── </span>
+                    <a href="HackTheBox/" class="folder">HackTheBox</a>
+                    <span class="status-badge badge-soon">coming soon</span>
+                </div>
+                <div class="tree-line">
+                    <span class="tree-prefix">│   └── </span>
+                    <span class="empty">No writeups yet...</span>
+                </div>
+
+                <!-- picoCTF -->
+                <div class="tree-line">
+                    <span class="tree-prefix">└── </span>
+                    <a href="picoCTF/" class="folder">picoCTF</a>
+                    <span class="status-badge badge-soon">coming soon</span>
+                </div>
+                <div class="tree-line">
+                    <span class="tree-prefix">    └── </span>
+                    <span class="empty">No writeups yet...</span>
+                </div>
+            </div>
+
+            <div class="footer">
+                <span class="prompt">zor0ark@ctf</span>:<span class="command">~</span>$ <span class="cursor"></span>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
