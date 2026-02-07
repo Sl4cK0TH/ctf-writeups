@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="CTF Writeup for Message to Garcia - TryHackMe challenge involving SSRF, LFI, and cryptographic exploitation">
+    <title>Writeup: Message to Garcia | TryHackMe CTF</title>
+    <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <span class="accent">&lt;</span>CTF<span class="accent">/&gt;</span> Writeup
+                <span class="badge badge-outline">Message to Garcia</span>
+            </div>
+            <div class="navbar-meta">
+                <div>Platform: <span>TryHackMe</span></div>
+                <div>Difficulty: <span class="difficulty-medium">Medium</span></div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <h1 class="hero-title">
+                <span class="gradient-text">Message to Garcia</span>
+            </h1>
+            <p class="hero-description">
+                This challenge tasks us with delivering a secure message to a user named "Garcia."
+                While the prompt is inspired by Elbert Hubbard's 1899 essay on initiative, the technical reality
+                involves exploiting a web application to uncover source code, analyzing a custom cryptographic
+                implementation, and forging a payload to bypass server-side validation.
+            </p>
+        </section>
+
+        <!-- Phase 1: Reconnaissance -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-number">1</div>
+                <h2 class="section-title">Reconnaissance & Enumeration</h2>
+            </div>
+
+            <div class="section-content">
+                <p class="mb-3">
+                    The target presents a web interface with a dark theme and instructions to securely deliver a
+                    message.
+                </p>
+
+                <!-- Main Dashboard Image -->
+                <div class="card mb-3">
+                    <a href="#" class="lightbox-trigger" data-src="assets/images/main_page.png"
+                        title="Click to enlarge">
+                        <img src="assets/images/main_page.png" alt="Main Challenge Dashboard" class="card-image">
+                    </a>
+                    <div class="card-caption">Figure 1: Main Application Interface — Upload encrypted messages</div>
+                </div>
+
+                <!-- Instructions Image -->
+                <div class="card card-small mb-3">
+                    <a href="#" class="lightbox-trigger" data-src="assets/images/instructions.png"
+                        title="Click to enlarge">
+                        <img src="assets/images/instructions.png" alt="Challenge Instructions" class="card-image">
+                    </a>
+                    <div class="card-caption">Figure 2: Challenge Instructions — Step-by-step guide</div>
+                </div>
+
+                <p class="mb-2">We identified three distinct features to investigate:</p>
+
+                <ul class="feature-grid">
+                    <!-- Upload Feature -->
+                    <li class="card full-width feature-card">
+                        <div class="card-body">
+                            <h3 class="card-title">/upload (Main Page)</h3>
+                            <p class="card-text">
+                                The main goal mechanism. Accepts <code>.gpg</code> or <code>.enc</code> files.
+                                Claims to use PGP encryption.
+                            </p>
+                        </div>
+                    </li>
+
+                    <!-- Backup Feature -->
+                    <li class="card feature-card">
+                        <div class="card-body">
+                            <h3 class="card-title">/backup</h3>
+                            <p class="card-text">
+                                Allows uploading files with custom filenames. Potential for Arbitrary File Write.
+                            </p>
+                        </div>
+                        <div class="card-image-container">
+                            <a href="#" class="lightbox-trigger" data-src="assets/images/backup_system.png"
+                                title="Click to enlarge">
+                                <img src="assets/images/backup_system.png" alt="Backup System Interface"
+                                    class="card-image">
+                            </a>
+                        </div>
+                    </li>
+
+                    <!-- Fetch Feature -->
+                    <li class="card feature-card">
+                        <div class="card-body">
+                            <h3 class="card-title">/fetch</h3>
+                            <p class="card-text">
+                                Fetches resources via URL. The placeholder <code>file://README.md</code> hints heavily
+                                at <strong>LFI</strong>.
+                            </p>
+                        </div>
+                        <div class="card-image-container">
+                            <a href="#" class="lightbox-trigger" data-src="assets/images/resource_fetcher.png"
+                                title="Click to enlarge">
+                                <img src="assets/images/resource_fetcher.png" alt="Resource Fetcher Interface"
+                                    class="card-image">
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Phase 2: Vulnerability Analysis -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-number">2</div>
+                <h2 class="section-title">Vulnerability Analysis</h2>
+            </div>
+
+            <div class="section-content">
+                <h3 class="mb-2">SSRF / Local File Inclusion (LFI)</h3>
+                <p class="mb-2">
+                    Using the <strong>Resource Fetcher</strong>, we confirmed Local File Inclusion using the
+                    <code>file://</code> protocol.
+                </p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">payload.txt</span>
+                    </div>
+                    <div class="terminal-body">
+                        <pre><code class="highlight">file:///etc/passwd</code></pre>
+                    </div>
+                </div>
+
+                <p class="mb-3">
+                    The server returned the content of <code>/etc/passwd</code>, revealing that the user
+                    <strong>garcia</strong>
+                    does not exist, but a standard user <strong>ubuntu</strong> does.
+                </p>
+
+                <h3 class="mb-2 mt-3">Directory Discovery via "Failed" Upload</h3>
+                <p class="mb-2">
+                    Attempts to upload a PHP shell via the <code>/backup</code> endpoint failed to execute code
+                    (due to filename sanitization), but the error message leaked the absolute path:
+                </p>
+
+                <div class="alert alert-error">
+                    File uploaded successfully to:
+                    <code>/home/ubuntu/sftp-msg2g4arc1a/uploads/var_www_html_shell.php</code>
+                </div>
+
+                <p class="mt-2">
+                    This confirmed the application root is:
+                    <code>/home/ubuntu/sftp-msg2g4arc1a/</code>
+                </p>
+            </div>
+        </section>
+
+        <!-- Phase 3: Source Code Review -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-number">3</div>
+                <h2 class="section-title">Source Code Extraction</h2>
+            </div>
+
+            <div class="section-content">
+                <p class="mb-3">
+                    Armed with the path and the LFI vulnerability, we extracted the application source code.
+                </p>
+
+                <!-- app.py -->
+                <div class="source-item">
+                    <h4 class="source-title">Target 1: app.py</h4>
+                    <p class="source-url">file:///home/ubuntu/sftp-msg2g4arc1a/app.py</p>
+                    <p class="card-text">
+                        Revealed the logic for the file upload. It imports validation logic from a separate module:
+                    </p>
+                    <div class="terminal mt-2">
+                        <div class="terminal-body">
+                            <pre><code class="highlight">from functions import is_valid_gpg_file, ensure_upload_folder, validate_encrypted_message</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- functions.py -->
+                <div class="source-item highlight">
+                    <h4 class="source-title">Target 2: functions.py (The Smoking Gun)</h4>
+                    <p class="source-url">file:///home/ubuntu/sftp-msg2g4arc1a/functions.py</p>
+                    <p class="card-text mb-2">
+                        This file exposed the cryptographic secrets. Despite the UI claiming "PGP",
+                        the backend uses <strong>Fernet</strong> (Symmetric Encryption).
+                    </p>
+
+                    <div class="terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="terminal-title">functions.py</span>
+                        </div>
+                        <div class="terminal-body">
+                            <pre><code><span class="text-muted">from</span> cryptography.fernet <span class="text-muted">import</span> Fernet
+
+<span class="text-muted"># The Encryption Key</span>
+ENCRYPTION_KEY = <span class="highlight">b'TUVTU0FHRVRPR0FSQ0lBMjAyNF9LRVkhISEhISEhISE='</span>
+cipher = Fernet(ENCRYPTION_KEY)
+
+<span class="text-muted"># The Expected Message</span>
+EXPECTED_MESSAGE = <span class="highlight">"Garcia, it seems I've cracked the code!! I need you to meet me at coordinates: 40.4168° N, 3.7038° W. The cipher is: TRACK"</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Phase 4: Exploitation -->
+        <section class="section">
+            <div class="section-header">
+                <div class="section-number">4</div>
+                <h2 class="section-title">Payload Creation & Delivery</h2>
+            </div>
+
+            <div class="section-content">
+                <p class="mb-2">
+                    To solve the challenge, we must upload a file that, when decrypted by the server using the
+                    hardcoded key, matches the <code>EXPECTED_MESSAGE</code>. We wrote a Python script to forge this
+                    file.
+                </p>
+
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">solve.py</span>
+                    </div>
+                    <div class="terminal-body">
+                        <pre><code><span class="text-muted">from</span> cryptography.fernet <span class="text-muted">import</span> Fernet
+
+<span class="text-muted"># 1. Use the leaked key</span>
+key = <span class="highlight">b'TUVTU0FHRVRPR0FSQ0lBMjAyNF9LRVkhISEhISEhISE='</span>
+cipher = Fernet(key)
+
+<span class="text-muted"># 2. Use the expected message</span>
+message = <span class="highlight">"Garcia, it seems I've cracked the code!! I need you to meet me at coordinates: 40.4168° N, 3.7038° W. The cipher is: TRACK"</span>
+
+<span class="text-muted"># 3. Encrypt payload</span>
+encrypted_data = cipher.encrypt(message.encode(<span class="highlight">'utf-8'</span>))
+
+<span class="text-muted"># 4. Save as .gpg to bypass frontend validation</span>
+<span class="text-muted">with</span> open(<span class="highlight">'message.gpg'</span>, <span class="highlight">'wb'</span>) <span class="text-muted">as</span> f:
+    f.write(encrypted_data)
+
+print(<span class="highlight">"[+] Payload message.gpg created."</span>)</code></pre>
+                    </div>
+                </div>
+
+                <p class="mt-3">
+                    After running the script and uploading <code>message.gpg</code> to the main dashboard,
+                    the server accepted the file and redirected us to the success page.
+                </p>
+            </div>
+        </section>
+
+        <!-- Mission Debrief -->
+        <section class="debrief">
+            <h2 class="debrief-title">🎯 Mission Debrief</h2>
+
+            <div class="qa-grid">
+                <!-- Q1 -->
+                <div class="qa-card">
+                    <div class="qa-label">Question 1</div>
+                    <div class="qa-question">What type of encryption is the service using?</div>
+                    <div class="qa-answer">Symmetric</div>
+                    <p class="qa-detail">The source code reveals a shared key is used for both encryption and
+                        decryption.</p>
+                </div>
+
+                <!-- Q2 -->
+                <div class="qa-card">
+                    <div class="qa-label">Question 2</div>
+                    <div class="qa-question">What implementation of authenticated encryption is used?</div>
+                    <div class="qa-answer">Fernet</div>
+                    <p class="qa-detail">Imported explicitly from the <code>cryptography</code> library.</p>
+                </div>
+
+                <!-- Q3 -->
+                <div class="qa-card full-width">
+                    <div class="qa-label">Question 3</div>
+                    <div class="qa-question">What is the encryption key?</div>
+                    <div class="qa-answer qa-answer-block">TUVTU0FHRVRPR0FSQ0lBMjAyNF9LRVkhISEhISEhISE=</div>
+                </div>
+
+                <!-- Q4 -->
+                <div class="qa-card full-width">
+                    <div class="qa-label">Question 4</div>
+                    <div class="qa-question">What is the message that needs to be delivered?</div>
+                    <p class="quote">
+                        Garcia, it seems I've cracked the code!! I need you to meet me at coordinates:
+                        40.4168° N, 3.7038° W. The cipher is: TRACK
+                    </p>
+                </div>
+
+                <!-- Q5 (Flag) -->
+                <div class="qa-card full-width flag">
+                    <div class="qa-label">Question 5 — The Flag 🏁</div>
+                    <div class="qa-answer">THM{ssrf_2_rce_v1a_message_2_garc1a}</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            &copy; 2026 CTF Writeup. Generated for educational purposes.
+        </div>
+    </footer>
+
+    <!-- Lightbox Overlay -->
+    <div id="lightbox" class="lightbox">
+        <button class="lightbox-close" aria-label="Close">&times;</button>
+        <img src="" alt="Enlarged view" class="lightbox-image">
+    </div>
+
+    <script>
+        // Lightbox functionality
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = lightbox.querySelector('.lightbox-image');
+        const lightboxClose = lightbox.querySelector('.lightbox-close');
+        const triggers = document.querySelectorAll('.lightbox-trigger');
+
+        triggers.forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                const imgSrc = trigger.getAttribute('data-src');
+                lightboxImg.src = imgSrc;
+                lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            });
+        });
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) closeLightbox();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLightbox();
+        });
+    </script>
+</body>
+
+</html>
